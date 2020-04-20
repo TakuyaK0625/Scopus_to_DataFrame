@@ -20,10 +20,11 @@ d <- fread("scopus.csv")
 names(d)
 
 # 列の選択
-d <- d %>% select(EID, DOI, 出版年, タイトル, 出版物名, 著者情報 = `著者 + 所属機関`)
+d <- d %>% select(EID, DOI, Year = 出版年, Title = タイトル, Journal = 出版物名, Auth_Info = `著者 + 所属機関`, Address = 連絡先住所)
 
 # EID以外の情報をネスト
 d <- d %>% nest(data = setdiff(names(.), "EID"))
+
 
 # ----------------------------------
 # 関数作成
@@ -38,16 +39,19 @@ clean.df <- function(x, y) {
     df <- data %>% 
         
         # 著者情報を";"で分割し、一人一行に展開
-        mutate(著者情報 = str_split(著者情報, "; ")) %>%
-        unnest(著者情報) %>%
+        mutate(Auth_Info = str_split(Auth_Info, "; ")) %>%
+        unnest(Auth_Info) %>%
         
         # コンマの数で所属情報の有無を判断し、条件分岐
-        mutate(著者名 = ifelse(str_count(著者情報, ",") >= 2,                       
-                            str_extract(著者情報, "^.*?,.*?(?=,)"), 著者情報)) %>%  
-        mutate(著者所属 = ifelse(str_count(著者情報, ",") >= 2, 
-                             str_replace(著者情報, "(^.*?,.*?, )(.*$)", "\\2"), NA)) %>% 
+        mutate(Author = ifelse(str_count(Auth_Info, ",") >= 2,                       
+                            str_extract(Auth_Info, "^.*?,.*?(?=,)"), Auth_Info)) %>%  
+        mutate(Institution = ifelse(str_count(Auth_Info, ",") >= 2, 
+                             str_replace(Auth_Info, "(^.*?,.*?, )(.*$)", "\\2"), NA)) %>% 
         
-        select(-著者情報) %>%
+        mutate(Auth_Fst = c(1, rep(0, nrow(.)-1))) %>%
+        mutate(Auth_Corr = Author == str_extract(Address, "^.*?(?=;)")) %>%
+        
+        select(-Auth_Info, -Address) %>%
         mutate(EID = y)
 
     df
